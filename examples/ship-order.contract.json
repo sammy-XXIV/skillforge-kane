@@ -1,0 +1,14 @@
+{
+  "id": "dispatch-ship-order",
+  "description": "Ship a requested order in the local Dispatch order desk and confirm its shipment status.",
+  "keywords": ["shipping", "fulfill", "dispatch", "order"],
+  "url": "http://127.0.0.1:4173",
+  "variables": {
+    "order_id": {"pattern": "ORD-[0-9]{3}", "description": "Existing order identifier, supplied by the user."}
+  },
+  "conditions": [
+    "The order detail heading identifies order {{order_id}}.",
+    "In the selected order details, Shipment status is exactly Shipped.",
+    "The activity log includes a shipment confirmation for order {{order_id}}."
+  ]
+}

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skillforge-kane"
+version = "0.1.0"
+description = "An agent skill that forges reusable browser-task skills, gated by Kane evidence."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "sammy-XXIV"}]
+dependencies = []
+classifiers = ["Operating System :: POSIX", "Programming Language :: Python :: 3"]
+
+[project.scripts]
+skillforge = "skillforge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["skillforge*"]

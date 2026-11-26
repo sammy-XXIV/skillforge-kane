@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dispatch — SkillForge test workspace</title>
+  <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="/" aria-label="Dispatch home"><span class="brand-icon" aria-hidden="true">↗</span> dispatch<span class="brand-period">.</span></a><span class="workspace">Field Supply / Operations</span><span class="demo-label">Demo workspace</span></header>
+  <main>
+    <div class="page-heading"><div><p class="eyebrow">Fulfillment desk</p><h1>A good day to ship.</h1><p class="intro">Three orders. Keep the handoff moving.</p></div><button id="reset" class="secondary">Reset workspace</button></div>
+    <div class="desk">
+      <section class="queue" aria-labelledby="queueHeading">
+        <div class="section-heading"><h2 id="queueHeading">Order queue <span id="orderCount">3</span></h2><span class="quiet">Local demo data</span></div>
+        <div class="table-wrap"><table><thead><tr><th scope="col">Order / customer</th><th scope="col">Payment</th><th scope="col">Shipment</th><th scope="col"><span class="sr-only">Details</span></th></tr></thead><tbody id="orders"></tbody></table></div>
+        <div class="queue-footer"><span class="status-dot" aria-hidden="true"></span> All changes stay in this browser.</div>
+        <div class="desk-note"><span class="note-icon" aria-hidden="true">↳</span><p><strong>Paid and shipped are separate.</strong><br>Record payment when it arrives. Confirm shipment when the parcel leaves.</p></div>
+      </section>
+      <aside id="details" role="region" aria-label="Order details" class="receipt" hidden>
+        <div class="receipt-top"><span class="eyebrow">Packing slip</span><span class="quiet">Field Supply</span></div>
+        <h2 id="detailHeading"></h2><p id="customer" class="customer"></p>
+        <div class="item"><span id="item"></span><span id="quantity"></span></div>
+        <dl class="statuses"><div><dt>Payment status</dt><dd id="paymentStatus"></dd></div><div><dt>Shipment status</dt><dd id="shipmentStatus"></dd></div></dl>
+        <div class="actions"><button id="markPaid" class="secondary">Mark paid</button><button id="markShipped" class="primary">Mark shipped <span aria-hidden="true">↗</span></button></div>
+        <div class="activity-heading">Activity</div><div id="activity" role="log" aria-label="Order activity" aria-live="polite"></div>
+        <div class="receipt-stamp" aria-hidden="true">FS / DISPATCH</div>
+      </aside>
+      <aside id="emptyDetails" class="empty-details"><span aria-hidden="true">↗</span><h2>One order at a time.</h2><p>Open an order to check its details<br>and prepare its next move.</p></aside>
+    </div>
+    <footer><span>Dispatch is a disposable fixture for SkillForge.</span><span>No real purchases, payments or shipments.</span></footer>
+  </main>
+  <dialog id="confirmDialog" aria-labelledby="confirmHeading"><p class="eyebrow">Confirm handoff</p><h2 id="confirmHeading">Ship this order?</h2><p id="confirmCopy"></p><div class="dialog-actions"><button id="cancelShipment" class="secondary">Keep in queue</button><button id="confirmShipment" class="primary">Confirm shipment</button></div></dialog>
+  <dialog id="resetDialog" aria-labelledby="resetHeading"><h2 id="resetHeading">Reset this workspace?</h2><p>This clears the demo changes in this browser.</p><div class="dialog-actions"><button id="cancelReset" class="secondary">Keep changes</button><button id="confirmReset" class="primary">Reset demo data</button></div></dialog>
+</body>
+</html>

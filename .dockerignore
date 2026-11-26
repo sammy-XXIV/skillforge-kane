@@ -1,0 +1,8 @@
+.git
+.skillforge
+.testmuai
+.env*
+node_modules
+__pycache__
+test-results
+playwright-report

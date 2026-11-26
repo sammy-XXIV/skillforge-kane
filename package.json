@@ -1,0 +1,11 @@
+{
+  "name": "skillforge-kane-browser-checks",
+  "private": true,
+  "description": "Development-only browser checks for SkillForge's disposable fixture.",
+  "scripts": {
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1"
+  }
+}
