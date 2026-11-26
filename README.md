@@ -31,13 +31,24 @@ package/evidence tampering, NDJSON parsing, child-process timeouts, argument
 safety, CLI behavior and the demo UI. Unit-test fixtures are explicitly labeled;
 they are **not real Kane verification**.
 
-Kane CLI 0.10.9 was installed and a real first run attempted on the development
-device. It refused because there is no TestMu login. Android/Termux also has no
-supported desktop Chrome here. **No successful live Kane run is claimed.**
-The manual [Real Kane verification workflow](../../actions/workflows/kane-live.yml)
-runs the complete failure → correction → pass → fresh-process reuse demonstration
-once `LT_USERNAME` and `LT_ACCESS_KEY` repository secrets are configured. Its
-correction is a supplied procedure, not a claim of an autonomous LLM repair.
+**The real Kane failure → correction → pass → fresh-process reuse demo passed**
+on November 26, 2026, using Kane CLI 0.10.9 and desktop Chrome on Linux.
+[Workflow and downloadable evidence](https://github.com/sammy-XXIV/skillforge-kane/actions/runs/45825042502)
+· [Machine-readable summary](docs/live-verification.json).
+
+The incorrect procedure's action passed, but independent acceptance returned
+`[true, true, false, false]`, so it was rejected. The corrected procedure and
+reuse on a different order both returned `[true, true, true, true]` and passed.
+The correction in this repeatable CI walkthrough is a supplied procedure,
+**not a claim of an autonomous LLM repair**. The generating skill tells the
+calling agent how to consume failure context and make the repair itself.
+
+The run used a temporary OAuth access token after the owner signed in; its
+repository secret was deleted afterward. No refresh token was transferred.
+To repeat the manual [workflow](https://github.com/sammy-XXIV/skillforge-kane/actions/workflows/kane-live.yml),
+configure `LT_USERNAME` and `LT_ACCESS_KEY`, or securely supply a temporary
+`KANE_OAUTH_PROFILE`. Android/Termux still lacks desktop Chrome; real execution
+was on Linux, not the phone.
 
 ## Install
 

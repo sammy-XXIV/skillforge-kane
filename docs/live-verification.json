@@ -1,0 +1,62 @@
+{
+  "attempts": [
+    {
+      "action_duration_seconds": 56.742,
+      "action_exit": 0,
+      "analysis_duration_seconds": 17.694,
+      "analysis_exit": 0,
+      "conditions": [
+        true,
+        true,
+        false,
+        false
+      ],
+      "fingerprint": "a450bef6cc30df69df79b393e7c3d0110c1f0fba7e20dd04cdd813196adc4dac",
+      "passed": false,
+      "phase": "wrong procedure",
+      "values": {
+        "order_id": "ORD-104"
+      }
+    },
+    {
+      "action_duration_seconds": 69.315,
+      "action_exit": 0,
+      "analysis_duration_seconds": 13.543,
+      "analysis_exit": 0,
+      "conditions": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "fingerprint": "14c0ab7a5bbf83efd0f59c119de9f2bdc8b2c4b36808a660507c5a749d5266dc",
+      "passed": true,
+      "phase": "corrected procedure",
+      "values": {
+        "order_id": "ORD-104"
+      }
+    },
+    {
+      "action_duration_seconds": 69.918,
+      "action_exit": 0,
+      "analysis_duration_seconds": 13.06,
+      "analysis_exit": 0,
+      "conditions": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "fingerprint": "14c0ab7a5bbf83efd0f59c119de9f2bdc8b2c4b36808a660507c5a749d5266dc",
+      "passed": true,
+      "phase": "fresh-process reuse",
+      "values": {
+        "order_id": "ORD-105"
+      }
+    }
+  ],
+  "correction": "Supplied corrected procedure; this CI walkthrough does not claim autonomous LLM repair.",
+  "environment": "GitHub Actions ubuntu-latest with owned Chrome/CDP",
+  "kane_version": "0.10.9",
+  "workflow_url": "https://github.com/sammy-XXIV/skillforge-kane/actions/runs/45825042502"
+}

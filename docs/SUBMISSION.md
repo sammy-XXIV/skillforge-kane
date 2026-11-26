@@ -26,7 +26,8 @@ reuses the resulting shipping skill for a different order.
 ## Before submitting
 
 - Confirm event registration and TestMu signup use the same email; claim credits.
-- Complete a real Kane failure → repaired pass → fresh-session reuse run.
+- Done: real Kane failure → corrected pass → fresh-session reuse:
+  https://github.com/sammy-XXIV/skillforge-kane/actions/runs/45825042502
 - If showing agent repair, record the agent making the edit from actual failure
   context; the CI example uses a supplied corrected procedure.
 - Record and upload a 3–5 minute YouTube demo.
@@ -36,14 +37,14 @@ reuses the resulting shipping skill for a different order.
 - Stop pushing before the published deadline: November 26, 11:59 PM IST
   (7:29 PM Lagos), unless the organizer explicitly changes it.
 
-The code being public or CI passing is not a submitted hackathon entry. There is
-no successful live Kane evidence, uploaded YouTube demo, public announcement or
-submitted entry claimed by this file. Registration and account authentication
-require the owner's available session; no TestMu identity was invented.
+The code being public and the real Kane run passing is not a submitted hackathon
+entry. No uploaded YouTube demo, public announcement or submitted entry is
+claimed here. The owner completed TestMu OAuth login; the live run used that
+account with a temporary access token, and the repository secret was removed.
 
 ## Announcement drafts — not posted
 
-Use only after the described real Kane demo has passed.
+The real Kane demo has passed. These drafts have not been posted.
 
 **Post 1**
 
@@ -61,6 +62,7 @@ context for repair. Here's the actual failure → repair → reuse demo: [YouTub
 
 ## Remaining account-dependent work
 
-TestMu login and credits, a supported desktop Chrome runtime for real Kane,
-registration, the real demo recording, YouTube upload, announcements and final
-form submission. These are not represented as completed by local unit tests.
+Confirm event registration, record the demo, upload it to YouTube, publish two
+announcements and submit the final form. TestMu login and the real Linux Kane
+run are complete. A future rerun needs a valid login or repository credentials;
+the temporary access-token secret was deliberately removed after this run.
