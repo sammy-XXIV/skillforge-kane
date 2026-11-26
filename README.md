@@ -5,55 +5,54 @@
 [![Tests](https://github.com/sammy-XXIV/skillforge-kane/actions/workflows/ci.yml/badge.svg)](https://github.com/sammy-XXIV/skillforge-kane/actions/workflows/ci.yml)
 
 SkillForge is an **agent skill that creates other agent skills** for browser
-tasks. The result is a real `SKILL.md` package with a reusable procedure, typed
-inputs, a script entrypoint, frozen acceptance criteria and verification evidence.
-It does not generate browser mini apps. The included Dispatch app is just a
-disposable target for the demonstration.
+tasks. When a capability is missing, the coding agent creates a reusable skill,
+Kane executes it, and an independent Kane analysis checks the result. Passing
+skills enter the registry. Every later reuse gets verified again.
+
+Each generated skill contains `SKILL.md`, a parameterized procedure, an input
+manifest, a script entrypoint and verification evidence.
 
 ```text
-Missing capability → freeze acceptance → generate skill → Kane executes
-                                                          ↓
-                  repair ← failure evidence ← Kane analyzes the result
-                     ↓                                    ↓ all true
-                  retry                             reusable registry
-                                                          ↓ next request
-                                                   execute + verify again
+Find a saved skill → build if missing → Kane executes → Kane verifies
+                                             ↑               ↓
+                                      repair from evidence   save on pass
+                                                             ↓
+                                                   reuse and verify again
 ```
 
-Kane is the runtime and admission gate. A passing action alone is insufficient:
-a separate assertion-only call inspects the **same browser page** against every
-frozen condition. A failed reuse removes the skill from discovery immediately.
+## Proven with real Kane runs
 
-## Verification status
+The complete **failure → correction → pass → fresh-process reuse** walkthrough
+passed on November 26, 2026, using Kane CLI 0.10.9 and Chrome on Linux.
 
-The automated suite covers registry admission/revocation, frozen contracts,
-package/evidence tampering, NDJSON parsing, child-process timeouts, argument
-safety, CLI behavior and the demo UI. Unit-test fixtures are explicitly labeled;
-they are **not real Kane verification**.
+| Task | What happened | Registry result |
+| --- | --- | --- |
+| Incorrect procedure, ORD-104 | Marked paid; independent checks caught that shipment was incomplete | Rejected |
+| Corrected procedure, ORD-104 | Shipment and activity-log checks passed | Skill saved |
+| Fresh-process reuse, ORD-105 | The same saved skill passed on a different order | Re-verified |
 
-**The real Kane failure → correction → pass → fresh-process reuse demo passed**
-on November 26, 2026, using Kane CLI 0.10.9 and desktop Chrome on Linux.
-[Workflow and downloadable evidence](https://github.com/sammy-XXIV/skillforge-kane/actions/runs/45825042502)
-· [Machine-readable summary](docs/live-verification.json).
+[View the successful run and download its evidence](https://github.com/sammy-XXIV/skillforge-kane/actions/runs/45825042502)
+· [Verification summary](docs/live-verification.json)
+· [Technical verification record](docs/VERIFICATION.md)
 
-The incorrect procedure's action passed, but independent acceptance returned
-`[true, true, false, false]`, so it was rejected. The corrected procedure and
-reuse on a different order both returned `[true, true, true, true]` and passed.
-The correction in this repeatable CI walkthrough is a supplied procedure,
-**not a claim of an autonomous LLM repair**. The generating skill tells the
-calling agent how to consume failure context and make the repair itself.
+The automated suite also passes **37 Python checks and 3 browser tests** in Linux
+CI, including registry integrity, failure revocation and Chrome/CDP lifecycle.
 
-The run used a temporary OAuth access token after the owner signed in; its
-repository secret was deleted afterward. No refresh token was transferred.
-To repeat the manual [workflow](https://github.com/sammy-XXIV/skillforge-kane/actions/workflows/kane-live.yml),
-configure `LT_USERNAME` and `LT_ACCESS_KEY`, or securely supply a temporary
-`KANE_OAUTH_PROFILE`. Android/Termux still lacks desktop Chrome; real execution
-was on Linux, not the phone.
+## How it works
+
+1. **Discover.** Search the registry for a verified skill matching the task.
+2. **Freeze.** Define the target, inputs and observable acceptance criteria before authoring.
+3. **Forge.** The coding agent writes the procedure; SkillForge generates its skill package.
+4. **Execute and verify.** Kane performs the task. A separate assertion-only call checks every frozen condition on the same page.
+5. **Repair.** Failure evidence returns to the coding agent, which revises the procedure and retries against the unchanged criteria.
+6. **Keep and reuse.** Passing packages become discoverable. Every reuse executes and verifies again.
+
+Package and evidence hashes bind verification to the exact saved skill. Editing
+it invalidates the previous pass. A failed reuse removes it from discovery.
 
 ## Install
 
-Use Linux or macOS with **Python 3.11+**, Node 18+, and Google Chrome installed.
-The registry uses POSIX file locking. Windows and Android are not runtime targets.
+Requires **Linux or macOS, Python 3.11+, Node 18+, Google Chrome and a TestMu login**.
 
 ```sh
 git clone https://github.com/sammy-XXIV/skillforge-kane.git
@@ -64,56 +63,38 @@ kane-cli login --oauth
 skillforge doctor
 ```
 
-No Python runtime dependencies. Without installation, replace `skillforge` with
-`python3 /absolute/path/to/skillforge-kane/forge.py`. Optional environment settings:
-
-| Setting | Purpose |
-| --- | --- |
-| `SKILLFORGE_HOME` | Registry directory; default `.skillforge` under the current working directory |
-| `KANE_BIN` | Kane executable path; default `kane-cli` on PATH |
-| `CHROME_BIN` | Chrome executable path, if it cannot be found automatically |
-
 Copy [skills/skillforge-kane](skills/skillforge-kane) into your agent's skills
-directory (for Codex, `~/.codex/skills/skillforge-kane`). The agent still needs
-the SkillForge executable and access to its registry. Start a new agent session
-so it discovers the skill. Example prompt:
+directory, such as `~/.codex/skills/skillforge-kane`, and start a fresh session.
+Keep the CLI installed and run from the project whose registry you want to use.
 
-> Use SkillForge. I need to ship order ORD-104 in the local Dispatch app. Look
-> for a matching skill first; if none exists, create and verify one. Do not
-> change payment status.
+> Use SkillForge. Ship order ORD-104 in the local Dispatch app. Look for a saved
+> skill first; if none exists, create and verify one. Preserve payment status.
 
-The coding agent authors and repairs the plain-English procedure. SkillForge
-does not secretly call another model or require a separate LLM API key.
+The calling coding agent authors and repairs procedures using its existing model.
+SkillForge supplies the packaging, execution, evidence and admission gate.
 
-## Run the demonstration
+## Try the walkthrough
 
-Start the fixture in a separate terminal:
+Dispatch is the included disposable order desk. Start it in a separate terminal:
 
 ```sh
 python3 demo/serve.py
 ```
 
-Freeze the task, then generate an intentionally incorrect skill:
+Freeze acceptance and generate the intentionally incorrect candidate:
 
 ```sh
 skillforge create examples/ship-order.contract.json
 skillforge author dispatch-ship-order --objective examples/wrong-objective.md
 skillforge verify dispatch-ship-order --values examples/first-request.json
-```
-
-The incorrect procedure records payment. The acceptance contract requires
-shipment. **A functioning Kane connection should execute the procedure but
-reject the final result.** A login refusal is not the intended demonstration.
-
-Feed the actual failure back to your coding agent:
-
-```sh
 skillforge repair dispatch-ship-order
 ```
 
-The agent reads the frozen contract and the action/analyzer evidence, changes
-the procedure to confirm shipment, and reruns verification. For a repeatable
-manual demonstration, the repository includes a corrected procedure:
+Kane executes the payment procedure, then independent checks reject the missing
+shipment. The repair command returns the frozen contract and failure evidence.
+
+This repeatable walkthrough includes a corrected procedure. During normal agent
+use, the calling agent writes its revision from that failure context.
 
 ```sh
 skillforge author dispatch-ship-order --objective examples/ship-order.objective.md
@@ -121,87 +102,69 @@ skillforge verify dispatch-ship-order --values examples/first-request.json
 skillforge find shipping
 ```
 
-Open a **fresh terminal or agent session** in the same project. Reuse the saved
-skill on a different order:
+Open a fresh terminal or agent session in the same project and reuse it:
 
 ```sh
 skillforge run dispatch-ship-order --values examples/reuse-request.json
 ```
 
-This launches a new private browser and runs both Kane phases again. No cached
-pass is reused. See [docs/DEMO.md](docs/DEMO.md) for the recording script.
+The second request uses ORD-105, starts a fresh browser, and runs both Kane phases
+again. See [the recording guide](docs/DEMO.md) for the full demo sequence.
 
-## What is actually saved?
+## The generated package
 
 ```text
-.skillforge/                      # private runtime data; gitignored
-├── contracts/<id>.json           # frozen task and acceptance conditions
+.skillforge/
+├── contracts/<id>.json          # frozen target, inputs and acceptance criteria
 ├── skills/<id>/
-│   ├── SKILL.md                  # agent instructions and when to use them
-│   ├── manifest.json             # task, target, input constraints, contract hash
-│   ├── objective.md              # reusable Kane procedure
-│   └── scripts/run.py            # trusted wrapper calling SkillForge
-├── evidence/<id>/<attempt>/      # request, action/analyzer logs, result
-└── state/<id>.json               # eligibility, failures, hashes, evidence link
+│   ├── SKILL.md                 # agent instructions
+│   ├── manifest.json            # inputs, criteria and contract hash
+│   ├── objective.md             # reusable Kane procedure
+│   └── scripts/run.py           # SkillForge entrypoint
+├── evidence/<id>/<attempt>/     # request, action/analysis logs and result
+└── state/<id>.json              # admission state and integrity hashes
 ```
 
-Candidate files exist in the skills directory, but only the gated `find` / `list`
-interface exposes eligible skills. Packages, contracts and the saved result are
-hashed. Any changed or missing artifact invalidates discovery. The runtime does
-not execute arbitrary generated Python or shell code. To move a registry, retain
-its evidence and update paths; moving a folder alone does not confer a pass.
+Runtime evidence stays private and gitignored by default. Discovery uses
+`find` or `list`; inspect candidates and failed attempts with `list --all`.
+Three consecutive failures pause execution for inspection.
 
-`verify` admits candidates. `run` requires a current verified package and then
-re-verifies it. `repair` prints context, not an automatic fix. `list --all` shows
-drafts, candidates, failures and stale packages. Three consecutive failures stop
-further execution for that contract; inspect the failure with the user rather
-than starting an unlimited repair loop. There is no bypass/force-pass option.
+| Command | Purpose |
+| --- | --- |
+| `create` | Freeze a task contract |
+| `author` | Generate or revise its candidate skill |
+| `verify` | Verify a candidate for admission |
+| `find` / `list` | Discover currently verified skills |
+| `run` | Execute and re-verify a saved skill |
+| `repair` | Return failure context to the coding agent |
+| `doctor` | Check local prerequisites |
 
-Exit codes: **0** success, **1** attempted verification did not pass, **2**
-usage/configuration refusal, **130** interrupted. A failed action may have had
-side effects; inspect current state before trying it again.
+Set `SKILLFORGE_HOME` to choose a registry directory, `KANE_BIN` for a custom Kane
+executable, or `CHROME_BIN` for a custom Chrome path. Without installing the CLI,
+use `python3 /path/to/skillforge-kane/forge.py` in its place.
 
-## Isolation and limits
+## Execution and development
 
-- Each invocation owns a new Chrome profile, loopback CDP endpoint and process
-  group, cleaned up afterward. It does not attach to your everyday browser.
-- The demo server exposes only three public assets. It cannot serve contracts,
-  registry files or credentials. Its application has no network requests.
-- **A browser profile is not an OS or network security sandbox.** The optional
-  [container](docs/ISOLATION.md) limits host filesystem access. Network access
-  remains necessary for Kane. The objective's origin restriction and final URL
-  check are not an enforced browser egress allowlist.
-- This version targets browser-task skills. It does not verify arbitrary local
-  scripts or claim general agent self-improvement. Frozen tests reduce moving
-  goalposts; Kane's AI assertions are not a mathematical proof of correctness.
-- Reusing skills performs their actions. Target only authorized apps. Fresh
-  profiles mean login-required tasks need additional explicit session setup;
-  the supplied demo requires none.
-- Evidence may contain page data. It stays private and gitignored by default.
-  GitHub Actions artifacts are visible to people with repository access; only
-  the synthetic fixture belongs in the supplied live workflow.
-- Hashes protect against accidental changes, not a malicious registry owner.
-  A verifier binary or registry that the owner deliberately forges is outside
-  the trust boundary.
-
-## Development
+Runs use fresh Chrome profiles and a trusted script entrypoint. The optional
+container, authorization boundaries and network behavior are documented in
+[Execution boundaries](docs/ISOLATION.md). Login-required target apps need session
+setup; Dispatch is ready to use without an application login.
 
 ```sh
 python3 -m unittest discover -s tests -v
-python3 -m compileall -q skillforge forge.py demo/serve.py
 npm ci
 npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-Python checks run locally and in Linux CI; browser checks run in Linux CI.
-Neither command spends Kane credits. The opt-in live workflow requires a real
-account and uses its Kane credits. No real-Kane workflow is triggered by a push.
+The manually triggered [real Kane workflow](https://github.com/sammy-XXIV/skillforge-kane/actions/workflows/kane-live.yml)
+uses TestMu credentials and Kane credits. Configure `LT_USERNAME` and
+`LT_ACCESS_KEY` as repository secrets, or securely supply a temporary
+`KANE_OAUTH_PROFILE`. Ordinary CI runs the automated tests without Kane credits.
 
-Official references: [Kane agent output](https://www.testmuai.com/docs/kane-cli-agent-mode),
-[CLI and analyzer flags](https://www.testmuai.com/docs/kane-cli-cli-reference),
-[authentication](https://www.testmuai.com/docs/kane-cli-authentication).
+Official docs: [agent output](https://www.testmuai.com/docs/kane-cli-agent-mode)
+· [CLI reference](https://www.testmuai.com/docs/kane-cli-cli-reference)
+· [authentication](https://www.testmuai.com/docs/kane-cli-authentication).
 
-Built for the [KaneCLI Online Hackathon](https://www.kaneclihack.sh/). See
-[docs/SUBMISSION.md](docs/SUBMISSION.md) for status and draft submission copy.
-MIT licensed.
+Built with Codex for the [KaneCLI Online Hackathon](https://www.kaneclihack.sh/).
+[Submission guide](docs/SUBMISSION.md). MIT licensed.
