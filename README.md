@@ -33,7 +33,6 @@ passed on November 26, 2026, using Kane CLI 0.10.9 and Chrome on Linux.
 
 [View the successful run and download its evidence](https://github.com/sammy-XXIV/skillforge-kane/actions/runs/45825042502)
 · [Verification summary](docs/live-verification.json)
-· [Technical verification record](docs/VERIFICATION.md)
 
 The automated suite also passes **37 Python checks and 3 browser tests** in Linux
 CI, including registry integrity, failure revocation and Chrome/CDP lifecycle.
@@ -93,8 +92,8 @@ skillforge repair dispatch-ship-order
 Kane executes the payment procedure, then independent checks reject the missing
 shipment. The repair command returns the frozen contract and failure evidence.
 
-This repeatable walkthrough includes a corrected procedure. During normal agent
-use, the calling agent writes its revision from that failure context.
+Apply the included corrected procedure to complete this walkthrough. For new
+tasks, the coding agent writes its revision using the returned failure evidence.
 
 ```sh
 skillforge author dispatch-ship-order --objective examples/ship-order.objective.md
@@ -127,7 +126,6 @@ again. See [the recording guide](docs/DEMO.md) for the full demo sequence.
 
 Runtime evidence stays private and gitignored by default. Discovery uses
 `find` or `list`; inspect candidates and failed attempts with `list --all`.
-Three consecutive failures pause execution for inspection.
 
 | Command | Purpose |
 | --- | --- |
@@ -143,12 +141,7 @@ Set `SKILLFORGE_HOME` to choose a registry directory, `KANE_BIN` for a custom Ka
 executable, or `CHROME_BIN` for a custom Chrome path. Without installing the CLI,
 use `python3 /path/to/skillforge-kane/forge.py` in its place.
 
-## Execution and development
-
-Runs use fresh Chrome profiles and a trusted script entrypoint. The optional
-container, authorization boundaries and network behavior are documented in
-[Execution boundaries](docs/ISOLATION.md). Login-required target apps need session
-setup; Dispatch is ready to use without an application login.
+## Development
 
 ```sh
 python3 -m unittest discover -s tests -v
@@ -157,10 +150,9 @@ npx playwright install --with-deps chromium
 npm run test:browser
 ```
 
-The manually triggered [real Kane workflow](https://github.com/sammy-XXIV/skillforge-kane/actions/workflows/kane-live.yml)
-uses TestMu credentials and Kane credits. Configure `LT_USERNAME` and
-`LT_ACCESS_KEY` as repository secrets, or securely supply a temporary
-`KANE_OAUTH_PROFILE`. Ordinary CI runs the automated tests without Kane credits.
+The [real Kane workflow](https://github.com/sammy-XXIV/skillforge-kane/actions/workflows/kane-live.yml)
+reproduces the complete walkthrough on Linux. Standard CI checks the registry,
+Chrome integration and demo interface on every push.
 
 Official docs: [agent output](https://www.testmuai.com/docs/kane-cli-agent-mode)
 · [CLI reference](https://www.testmuai.com/docs/kane-cli-cli-reference)
