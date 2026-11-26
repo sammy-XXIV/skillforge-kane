@@ -3,9 +3,13 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
 
-from skillforge.kane import parse_result, process, Kane
+from skillforge.kane import parse_result, process, Kane, page_identity
+from skillforge.core import ForgeError
 
 
 def stream(status='passed', **fields):
@@ -62,6 +66,14 @@ class ProcessTests(unittest.TestCase):
         result = process(['/skillforge/no-such-program'], 1)
         self.assertNotEqual(result['exit_code'], 0)
 
+    def test_timeout_kills_pipe_inheriting_descendant_after_leader_exits(self):
+        child = 'import time; time.sleep(4)'
+        parent = 'import subprocess,sys; subprocess.Popen([sys.executable,"-c",sys.argv[1]])'
+        started = time.monotonic()
+        result = process([sys.executable, '-c', parent, child], .1)
+        self.assertTrue(result['timed_out'])
+        self.assertLess(time.monotonic() - started, 2)
+
     def test_adapter_uses_distinct_action_and_analyzer_on_same_browser(self):
         with tempfile.TemporaryDirectory() as folder:
             fixture = Path(folder) / 'fixture.py'
@@ -75,7 +87,8 @@ if '--analyzer-only' in sys.argv:
     event['condition_results'] = [True] * sys.argv.count('--condition')
 print(json.dumps(event))
 ''')
-            kane = Kane(command=[sys.executable, str(fixture), str(log)])
+            kane = Kane(command=[sys.executable, str(fixture), str(log)],
+                        inspect_page=lambda *_: {'id': 'same-page', 'url': 'http://127.0.0.1:4173/'})
             result = kane.execute({'url': 'http://127.0.0.1:4173'}, 'Ship order ORD-104',
                                   ['Shipment says Shipped'], 'http://127.0.0.1:9222')
             self.assertTrue(result['passed'])
@@ -86,6 +99,38 @@ print(json.dumps(event))
             self.assertEqual(calls[0][calls[0].index('--cdp-endpoint') + 1],
                              calls[1][calls[1].index('--cdp-endpoint') + 1])
             self.assertEqual(calls[1].count('--condition'), 2)  # target-origin check too
+
+
+class PageIdentityTests(unittest.TestCase):
+    def test_one_authorized_page_is_required_and_unused_blank_tabs_are_closed(self):
+        pages = [{'type': 'page', 'id': 'blank', 'url': 'about:blank'},
+                 {'type': 'page', 'id': 'task', 'url': 'http://127.0.0.1:4173/orders'}]
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path.startswith('/json/close/'):
+                    pages[:] = [p for p in pages if p['id'] != self.path.rsplit('/', 1)[1]]
+                    data = b'closed'
+                else:
+                    data = json.dumps(pages).encode()
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(data)
+            def log_message(self, *_):
+                pass
+        server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        endpoint = f'http://127.0.0.1:{server.server_port}'
+        self.assertEqual(page_identity(endpoint, 'http://127.0.0.1:4173')['id'], 'task')
+        self.assertEqual(len(pages), 1)
+        pages.append({'type': 'page', 'id': 'other', 'url': 'http://127.0.0.1:4173/other'})
+        with self.assertRaises(ForgeError):
+            page_identity(endpoint, 'http://127.0.0.1:4173')
+        pages[:] = [{'type': 'page', 'id': 'outside', 'url': 'https://example.com'}]
+        with self.assertRaises(ForgeError):
+            page_identity(endpoint, 'http://127.0.0.1:4173')
 
 
 if __name__ == '__main__':

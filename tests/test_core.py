@@ -168,6 +168,40 @@ class RegistryTests(unittest.TestCase):
         with self.store.locked(), self.assertRaises(ForgeError):
             Store(self.store.root).create(contract())
 
+    def test_interruption_preserves_failure_evidence_and_repair_budget(self):
+        self.candidate()
+        def interrupted(*_):
+            raise KeyboardInterrupt()
+        with self.assertRaises(KeyboardInterrupt):
+            self.store.verify('ship-order', self.values, runner=interrupted)
+        brief = self.store.repair('ship-order')
+        self.assertFalse(brief['last_result']['passed'])
+        self.assertEqual(brief['remaining_failure_budget'], 2)
+        self.assertEqual(self.store.find('shipping'), [])
+
+    def test_abruptly_killed_attempt_still_has_repair_context(self):
+        self.candidate()
+        state = self.store._state('ship-order')
+        evidence = self.store.root / 'evidence' / 'ship-order' / 'incomplete'
+        evidence.mkdir(parents=True)
+        state.update(status='verifying', evidence=str(evidence))
+        self.store._save_state('ship-order', state)
+        brief = self.store.repair('ship-order')
+        self.assertEqual(brief['contract']['conditions'], contract()['conditions'])
+        self.assertFalse(brief['last_result']['passed'])
+        self.assertIn('incomplete', brief['last_result']['reason'].lower())
+
+    def test_request_and_phase_logs_are_integrity_bound(self):
+        self.candidate()
+        runner = lambda *_: {'passed': True, 'action': {'stdout': 'original', 'stderr': ''}}
+        for filename in ['request.json', 'action.stdout.log']:
+            with self.subTest(filename=filename):
+                self.store.author('ship-order', 'Ship {{order_id}}.')
+                result = self.store.verify('ship-order', self.values, runner=runner)
+                path = Path(result['evidence']) / filename
+                path.write_text('modified')
+                self.assertEqual(self.store.find('shipping'), [])
+
 
 if __name__ == '__main__':
     unittest.main()

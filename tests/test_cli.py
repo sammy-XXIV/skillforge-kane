@@ -54,6 +54,16 @@ class CLITests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn('error', result)
 
+    def test_malformed_contract_fields_are_json_refusals(self):
+        for changes in [{'url': 123}, {'url': 'https://[broken'}, {'variables': []},
+                        {'variables': {'order_id': None}}, {'conditions': [12]},
+                        {'keywords': [None]}, {'id': None}]:
+            with self.subTest(changes=changes):
+                self.spec.write_text(json.dumps(contract() | changes))
+                code, result = self.invoke('create', str(self.spec))
+                self.assertEqual(code, 2)
+                self.assertFalse(result['ok'])
+
     def test_no_live_mock_mode_exists(self):
         proc = subprocess.run([sys.executable, str(ROOT / 'forge.py'), 'verify', '--help'],
                               capture_output=True, text=True, env=self.env)

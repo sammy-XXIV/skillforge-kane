@@ -8,22 +8,29 @@ import signal
 import subprocess
 import tempfile
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, quote
+from urllib.request import urlopen
 
 from .core import ForgeError
 
 
 def stop(proc):
-    if proc.poll() is None:
+    # The leader may have exited while descendants still hold our output pipes.
+    # The owned process group must be terminated in both cases.
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        pass
+    finally:
         try:
-            os.killpg(proc.pid, signal.SIGTERM)
-            proc.wait(timeout=3)
-        except (ProcessLookupError, subprocess.TimeoutExpired):
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            proc.wait()
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        proc.wait(timeout=3)
 
 
 def process(argv, timeout):
@@ -40,10 +47,18 @@ def process(argv, timeout):
     except subprocess.TimeoutExpired:
         timed_out = True
         stop(proc)
-        stdout, stderr = proc.communicate()
+        try:
+            stdout, stderr = proc.communicate(timeout=2)
+        except subprocess.TimeoutExpired as exc:
+            # A descendant could escape the group. Never drain its pipes forever.
+            stdout, stderr = exc.output or b'', exc.stderr or b''
+            proc.stdout.close()
+            proc.stderr.close()
     except BaseException:
         stop(proc)
         raise
+    finally:
+        stop(proc)
     return {'stdout': stdout.decode('utf-8', errors='replace'),
             'stderr': stderr.decode('utf-8', errors='replace'),
             'exit_code': proc.returncode, 'timed_out': timed_out,
@@ -93,6 +108,31 @@ def chrome_binary():
                  if (found := shutil.which(name))), None)
 
 
+def page_identity(endpoint, origin):
+    """Give the analyzer exactly one task page, rather than assume tab selection."""
+    with urlopen(endpoint + '/json/list', timeout=3) as response:
+        targets = json.load(response)
+    if not isinstance(targets, list):
+        raise ForgeError('Chrome returned no target list.')
+    pages = [t for t in targets if isinstance(t, dict) and t.get('type') == 'page']
+    # Chrome/Kane may leave the initial blank tab alongside the actual task page.
+    # Close only empty, unused tabs; never select among multiple real task pages.
+    nonblank = [t for t in pages if t.get('url') not in ('about:blank', '')]
+    if len(nonblank) == 1:
+        for target in pages:
+            if target not in nonblank:
+                with urlopen(endpoint + '/json/close/' + quote(target['id'], safe=''), timeout=3) as response:
+                    response.read()
+        pages = nonblank
+    if len(pages) != 1:
+        raise ForgeError('Keep exactly one final task page open for independent verification.')
+    target = pages[0]
+    url = urlsplit(target.get('url', ''))
+    if f'{url.scheme}://{url.netloc}' != origin or not target.get('id'):
+        raise ForgeError('The final browser page is outside the frozen target origin.')
+    return {'id': target['id'], 'url': target['url']}
+
+
 @contextmanager
 def browser():
     chrome = chrome_binary()
@@ -128,9 +168,10 @@ def browser():
 
 
 class Kane:
-    def __init__(self, command=None, timeout=120):
+    def __init__(self, command=None, timeout=120, inspect_page=page_identity):
         self.command = command or [os.environ.get('KANE_BIN', 'kane-cli')]
         self.timeout = timeout
+        self.inspect_page = inspect_page
 
     def __call__(self, spec, objective, conditions):
         if not shutil.which(self.command[0]):
@@ -150,6 +191,10 @@ class Kane:
         action.update(parse_result(action['stdout'], action['exit_code']))
         if not action['passed'] or action['timed_out']:
             return {'passed': False, 'reason': action['reason'], 'action': action, 'source': 'kane-cli'}
+        try:
+            page = self.inspect_page(endpoint, origin)
+        except (ForgeError, OSError, ValueError) as exc:
+            return {'passed': False, 'reason': str(exc), 'action': action, 'source': 'kane-cli'}
         checks = [f'The current browser page URL has origin {origin}.', *conditions]
         arguments = [*self.command, 'run', '--analyzer-only', *common]
         for condition in checks:
@@ -157,6 +202,14 @@ class Kane:
         analysis = process(arguments, self.timeout + 15)
         analysis.update(parse_result(analysis['stdout'], analysis['exit_code'], len(checks)))
         passed = analysis['passed'] and not analysis['timed_out']
+        page_error = None
+        try:
+            if self.inspect_page(endpoint, origin) != page:
+                page_error = 'The browser page changed between action and independent analysis.'
+        except (ForgeError, OSError, ValueError) as exc:
+            page_error = str(exc)
+        passed = passed and page_error is None
         return {'passed': passed, 'source': 'kane-cli', 'action': action, 'analysis': analysis,
+                'page': page,
                 'reason': ('Action completed and every frozen condition independently confirmed.'
-                           if passed else analysis['reason'])}
+                           if passed else page_error or analysis['reason'])}

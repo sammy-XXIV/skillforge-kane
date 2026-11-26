@@ -59,7 +59,10 @@ def validate_contract(spec):
     valid_id(spec.get('id'))
     if not isinstance(spec.get('description'), str) or not spec['description'].strip():
         raise ForgeError('A description is required.')
-    url = urlsplit(spec.get('url', ''))
+    if not isinstance(spec.get('url'), str) or any(ord(c) <= 32 for c in spec['url']):
+        raise ForgeError('Contract url must be an HTTP(S) URL string without whitespace.')
+    url = urlsplit(spec['url'])
+    _ = url.port  # validate numeric range before attempting browser execution
     if url.scheme not in ('http', 'https') or not url.hostname or url.username or url.password:
         raise ForgeError('Contract url must be an HTTP(S) URL without embedded credentials.')
     conditions = spec.get('conditions')
@@ -216,9 +219,20 @@ class Store:
         try:
             if state.get('status') != 'verified' or state.get('fingerprint') != self._fingerprint(name):
                 return False
-            evidence = Path(state['evidence']) / 'result.json'
-            return (hashlib.sha256(evidence.read_bytes()).hexdigest() == state.get('evidence_sha256')
-                    and read_json(evidence).get('passed') is True)
+            folder = Path(state['evidence'])
+            evidence = folder / 'result.json'
+            if hashlib.sha256(evidence.read_bytes()).hexdigest() != state.get('evidence_sha256'):
+                return False
+            result = read_json(evidence)
+            artifacts = result.get('artifacts', {})
+            if result.get('passed') is not True or 'request.json' not in artifacts:
+                return False
+            for filename, expected in artifacts.items():
+                path = folder / filename
+                if (Path(filename).name != filename or path.is_symlink()
+                        or hashlib.sha256(path.read_bytes()).hexdigest() != expected):
+                    return False
+            return True
         except (ForgeError, OSError, KeyError):
             return False
 
@@ -266,7 +280,7 @@ class Store:
             raise ForgeError('Three consecutive failures: stop and inspect the evidence with the user.')
         fingerprint = self._fingerprint(name)
         evidence = self.root / 'evidence' / name / uuid.uuid4().hex
-        state.update(status='verifying', evidence=str(evidence))
+        state.update(status='verifying', evidence=str(evidence), failures=state.get('failures', 0) + 1)
         self._save_state(name, state)  # a killed process cannot leave a reusable pass
         write(evidence / 'request.json', canonical({
             'id': name, 'fingerprint': fingerprint, 'url': spec['url'],
@@ -275,12 +289,16 @@ class Store:
         if runner is None:
             from .kane import Kane
             runner = Kane()
+        interruption = None
         try:
             result = runner(spec, objective, conditions)
             if not isinstance(result, dict):
                 raise ForgeError('Verifier returned no result object.')
         except Exception as exc:
             result = {'passed': False, 'reason': f'{type(exc).__name__}: {exc}'}
+        except (KeyboardInterrupt, SystemExit) as exc:
+            interruption = exc
+            result = {'passed': False, 'reason': 'Interrupted during verification; inspect current app state before retrying.'}
         result['passed'] = result.get('passed') is True
         if fingerprint != self._fingerprint(name):
             result.update(passed=False, reason='Package changed while verification was running.')
@@ -290,21 +308,32 @@ class Store:
             if isinstance(result.get(phase), dict):
                 for channel in ('stdout', 'stderr'):
                     write(evidence / f'{phase}.{channel}.log', result[phase].get(channel, ''))
+        result['artifacts'] = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                               for path in evidence.iterdir() if path.is_file()}
         write(evidence / 'result.json', canonical(result))
         state.update(status='verified' if result['passed'] else 'failed',
-                     failures=0 if result['passed'] else state.get('failures', 0) + 1,
+                     failures=0 if result['passed'] else state['failures'],
                      fingerprint=fingerprint, evidence=str(evidence))
         state['evidence_sha256'] = hashlib.sha256((evidence / 'result.json').read_bytes()).hexdigest()
         self._save_state(name, state)
+        if interruption is not None:
+            raise interruption
         return result
 
     def repair(self, name):
         with self.locked():
             state = self._state(name)
             evidence = state.get('evidence')
+            last_result = None
+            if evidence:
+                try:
+                    last_result = read_json(Path(evidence) / 'result.json')
+                except ForgeError:
+                    last_result = {'passed': False, 'evidence': evidence,
+                                   'reason': 'Incomplete or damaged attempt. Inspect preserved request/logs and current app state before retrying.'}
             return {'id': name, 'contract': self._contract(name),
                     'objective': (self._package(name) / 'objective.md').read_text(encoding='utf-8'),
-                    'last_result': read_json(Path(evidence) / 'result.json') if evidence else None,
+                    'last_result': last_result,
                     'remaining_failure_budget': max(0, 3 - state.get('failures', 0)),
                     'instruction': 'Use failure evidence to repair only the procedure. Preserve the frozen contract. '
                                    'Do not rerun a potentially non-idempotent action without checking current state. '
