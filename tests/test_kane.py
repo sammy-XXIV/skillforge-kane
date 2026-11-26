@@ -105,13 +105,20 @@ class PageIdentityTests(unittest.TestCase):
     def test_one_authorized_page_is_required_and_unused_blank_tabs_are_closed(self):
         pages = [{'type': 'page', 'id': 'blank', 'url': 'about:blank'},
                  {'type': 'page', 'id': 'task', 'url': 'http://127.0.0.1:4173/orders'}]
+        closed = set()
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 if self.path.startswith('/json/close/'):
-                    pages[:] = [p for p in pages if p['id'] != self.path.rsplit('/', 1)[1]]
+                    name = self.path.rsplit('/', 1)[1]
+                    if name in closed:
+                        self.send_error(404)
+                        return
+                    closed.add(name)
                     data = b'closed'
                 else:
                     data = json.dumps(pages).encode()
+                    # Chrome may expose a stale target once after accepting close.
+                    pages[:] = [p for p in pages if p['id'] not in closed]
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(data)
@@ -123,6 +130,7 @@ class PageIdentityTests(unittest.TestCase):
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         endpoint = f'http://127.0.0.1:{server.server_port}'
+        self.assertEqual(page_identity(endpoint, 'http://127.0.0.1:4173')['id'], 'task')
         self.assertEqual(page_identity(endpoint, 'http://127.0.0.1:4173')['id'], 'task')
         self.assertEqual(len(pages), 1)
         pages.append({'type': 'page', 'id': 'other', 'url': 'http://127.0.0.1:4173/other'})

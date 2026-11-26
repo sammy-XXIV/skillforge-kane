@@ -10,6 +10,7 @@ import tempfile
 import time
 from urllib.parse import urlsplit, quote
 from urllib.request import urlopen
+from urllib.error import HTTPError
 
 from .core import ForgeError
 
@@ -110,20 +111,30 @@ def chrome_binary():
 
 def page_identity(endpoint, origin):
     """Give the analyzer exactly one task page, rather than assume tab selection."""
-    with urlopen(endpoint + '/json/list', timeout=3) as response:
-        targets = json.load(response)
-    if not isinstance(targets, list):
-        raise ForgeError('Chrome returned no target list.')
-    pages = [t for t in targets if isinstance(t, dict) and t.get('type') == 'page']
-    # Chrome/Kane may leave the initial blank tab alongside the actual task page.
-    # Close only empty, unused tabs; never select among multiple real task pages.
-    nonblank = [t for t in pages if t.get('url') not in ('about:blank', '')]
-    if len(nonblank) == 1:
+    deadline = time.monotonic() + 3
+    while True:
+        with urlopen(endpoint + '/json/list', timeout=3) as response:
+            targets = json.load(response)
+        if not isinstance(targets, list):
+            raise ForgeError('Chrome returned no target list.')
+        pages = [t for t in targets if isinstance(t, dict) and t.get('type') == 'page']
+        # Close only empty, unused tabs; never choose among real task pages.
+        nonblank = [t for t in pages if t.get('url') not in ('about:blank', '')]
+        if len(nonblank) != 1 or len(pages) == 1:
+            break
         for target in pages:
             if target not in nonblank:
-                with urlopen(endpoint + '/json/close/' + quote(target['id'], safe=''), timeout=3) as response:
-                    response.read()
-        pages = nonblank
+                try:
+                    with urlopen(endpoint + '/json/close/' + quote(target['id'], safe=''), timeout=3) as response:
+                        response.read()
+                except HTTPError as exc:
+                    exc.close()
+                    if exc.code != 404:  # already closing is the only tolerated error
+                        raise
+        if time.monotonic() >= deadline:
+            raise ForgeError('Chrome did not finish closing its unused blank tabs.')
+        # Target closure is asynchronous. Observe its disappearance before analysis.
+        time.sleep(.02)
     if len(pages) != 1:
         raise ForgeError('Keep exactly one final task page open for independent verification.')
     target = pages[0]
